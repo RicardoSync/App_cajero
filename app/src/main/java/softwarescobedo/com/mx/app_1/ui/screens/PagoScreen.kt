@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import softwarescobedo.com.mx.app_1.data.ClienteSearchResult
 import softwarescobedo.com.mx.app_1.data.MetodoPago
@@ -128,22 +129,38 @@ fun PagoScreen() {
         loadMetodosPago()
     }
 
-    // Ejecutar búsqueda de cliente
-    fun handleSearch() {
-        if (searchQuery.trim().isEmpty()) return
+    // Búsqueda en tiempo real de cliente con Debounce (350 ms)
+    LaunchedEffect(searchQuery) {
+        val query = searchQuery.trim()
+        if (query.isEmpty()) {
+            searchResults = emptyList()
+            isSearching = false
+            return@LaunchedEffect
+        }
+
+        // Si ya hay un cliente seleccionado con ese nombre o ID, no repetir la búsqueda
+        if (selectedCliente != null && (selectedCliente!!.nombreCompleto.equals(query, ignoreCase = true) || selectedCliente!!.id.toString() == query)) {
+            return@LaunchedEffect
+        }
+
+        delay(350) // Esperar 350ms a que el usuario termine de teclear
+
         val settings = repository.getSettings()
+        if (settings.token.isEmpty() || settings.subdominio.isEmpty()) return@LaunchedEffect
+
         isSearching = true
         errorMessage = null
 
-        scope.launch {
-            val result = apiService.buscarClientes(settings, searchQuery)
-            isSearching = false
-            result.onSuccess { list ->
-                searchResults = list
-            }.onFailure { ex ->
-                searchResults = emptyList()
-                errorMessage = ex.localizedMessage ?: "No se encontraron clientes"
+        val result = apiService.buscarClientes(settings, query)
+        isSearching = false
+        result.onSuccess { list ->
+            searchResults = list
+            if (list.isEmpty()) {
+                errorMessage = "No se encontraron clientes que coincidan con '$query'"
             }
+        }.onFailure { ex ->
+            searchResults = emptyList()
+            errorMessage = ex.localizedMessage ?: "No se encontraron clientes"
         }
     }
 
@@ -260,30 +277,29 @@ fun PagoScreen() {
                     label = { Text("Nombre o ID del cliente") },
                     placeholder = { Text("Ej. Ricardo Escobedo o 122") },
                     singleLine = true,
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Person, contentDescription = null)
+                    },
                     trailingIcon = {
                         if (isSearching) {
                             CircularProgressIndicator(
                                 modifier = Modifier.height(20.dp).width(20.dp),
                                 strokeWidth = 2.dp
                             )
-                        } else {
-                            IconButton(onClick = { handleSearch() }) {
-                                Icon(imageVector = Icons.Default.Search, contentDescription = "Buscar")
+                        } else if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                searchResults = emptyList()
+                                errorMessage = null
+                            }) {
+                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Limpiar búsqueda")
                             }
+                        } else {
+                            Icon(imageVector = Icons.Default.Search, contentDescription = null)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                Button(
-                    onClick = { handleSearch() },
-                    enabled = !isSearching && searchQuery.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Buscar Cliente")
-                }
 
                 // Lista de resultados encontrados
                 if (searchResults.isNotEmpty()) {

@@ -245,7 +245,7 @@ fun AjustesScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "© 2026 MiWISPro | Software Escobedo",
+            text = "© 2026 AdminWISP | Software Escobedo",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,

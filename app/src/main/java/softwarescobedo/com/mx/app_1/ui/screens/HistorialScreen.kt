@@ -2,6 +2,8 @@ package softwarescobedo.com.mx.app_1.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +31,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,6 +60,10 @@ import kotlinx.coroutines.launch
 import softwarescobedo.com.mx.app_1.data.PagoHistorial
 import softwarescobedo.com.mx.app_1.data.SettingsRepository
 import softwarescobedo.com.mx.app_1.network.ApiService
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +81,18 @@ fun HistorialScreen() {
     var isFilterPanelOpen by remember { mutableStateOf(false) }
     var queryCliente by remember { mutableStateOf("") }
     var queryFecha by remember { mutableStateOf("") }
+
+    // Estado del selector de fecha (Calendario)
+    var showDatePicker by remember { mutableStateOf(false) }
+    val dateInteractionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(dateInteractionSource) {
+        dateInteractionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release) {
+                showDatePicker = true
+            }
+        }
+    }
 
     // Estado del modal de detalle de pago
     var selectedPago by remember { mutableStateOf<PagoHistorial?>(null) }
@@ -226,20 +247,30 @@ fun HistorialScreen() {
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // 2. Filtro por Fecha
+                    // 2. Filtro por Fecha (Selector con calendario)
                     OutlinedTextField(
                         value = queryFecha,
-                        onValueChange = { queryFecha = it },
+                        onValueChange = { },
+                        readOnly = true,
+                        interactionSource = dateInteractionSource,
                         label = { Text("Fecha de pago") },
-                        placeholder = { Text("Ej. 2026-07-20") },
+                        placeholder = { Text("Seleccionar fecha") },
                         singleLine = true,
                         leadingIcon = {
-                            Icon(imageVector = Icons.Default.CalendarToday, contentDescription = null)
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Seleccionar fecha",
+                                modifier = Modifier.clickable { showDatePicker = true }
+                            )
                         },
                         trailingIcon = {
                             if (queryFecha.isNotEmpty()) {
                                 IconButton(onClick = { queryFecha = "" }) {
-                                    Icon(imageVector = Icons.Default.Clear, contentDescription = null)
+                                    Icon(imageVector = Icons.Default.Clear, contentDescription = "Limpiar fecha")
+                                }
+                            } else {
+                                IconButton(onClick = { showDatePicker = true }) {
+                                    Icon(imageVector = Icons.Default.CalendarToday, contentDescription = "Abrir calendario")
                                 }
                             }
                         },
@@ -339,6 +370,56 @@ fun HistorialScreen() {
             pago = selectedPago!!,
             onDismiss = { selectedPago = null }
         )
+    }
+
+    // Diálogo Selector de Fecha (Calendario)
+    if (showDatePicker) {
+        val initialMillis = remember(queryFecha) {
+            if (queryFecha.isNotBlank()) {
+                try {
+                    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }
+                    sdf.parse(queryFecha.trim())?.time
+                } catch (e: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialMillis
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply {
+                                timeZone = TimeZone.getTimeZone("UTC")
+                            }
+                            queryFecha = formatter.format(Date(millis))
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDatePicker = false }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 }
 
