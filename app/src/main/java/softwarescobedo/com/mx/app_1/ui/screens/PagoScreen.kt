@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -87,6 +86,7 @@ fun PagoScreen() {
     var isSearching by remember { mutableStateOf(false) }
     var searchResults by remember { mutableStateOf<List<ClienteSearchResult>>(emptyList()) }
     var selectedCliente by remember { mutableStateOf<ClienteSearchResult?>(null) }
+    var clienteToPreview by remember { mutableStateOf<ClienteSearchResult?>(null) }
 
     // Métodos de pago
     var metodosPago by remember { mutableStateOf<List<MetodoPago>>(emptyList()) }
@@ -234,6 +234,7 @@ fun PagoScreen() {
     // Resetear formulario para nuevo pago
     fun resetForm() {
         selectedCliente = null
+        clienteToPreview = null
         searchResults = emptyList()
         searchQuery = ""
         montoInput = ""
@@ -314,7 +315,7 @@ fun PagoScreen() {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { selectCliente(cliente) },
+                                    .clickable { clienteToPreview = cliente },
                                 colors = CardDefaults.cardColors(
                                     containerColor = if (selectedCliente?.id == cliente.id) {
                                         MaterialTheme.colorScheme.primaryContainer
@@ -323,31 +324,52 @@ fun PagoScreen() {
                                     }
                                 )
                             ) {
-                                Row(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
                                             text = cliente.nombreCompleto,
                                             style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.weight(1f)
                                         )
                                         Text(
-                                            text = "ID: ${cliente.id} | Saldo: $${cliente.saldoActual} MXN",
-                                            style = MaterialTheme.typography.bodySmall
+                                            text = "Base: $${cliente.precioMensualBase}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
 
                                     Text(
-                                        text = "Base: $${cliente.precioMensualBase}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        text = "ID: #${cliente.id} | Saldo: $${cliente.saldoActual} MXN",
+                                        style = MaterialTheme.typography.bodySmall
                                     )
+
+                                    if (cliente.nombreComunidad.isNotEmpty()) {
+                                        Text(
+                                            text = "Comunidad: ${cliente.nombreComunidad}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+
+                                    if (cliente.fechaUltimoPago.isNotEmpty()) {
+                                        Text(
+                                            text = "Último pago: ${formatFechaSimple(cliente.fechaUltimoPago)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -381,9 +403,24 @@ fun PagoScreen() {
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "ID Cliente: ${selectedCliente!!.id}",
+                                        text = "ID Cliente: #${selectedCliente!!.id}",
                                         style = MaterialTheme.typography.bodySmall
                                     )
+                                    if (selectedCliente!!.nombreComunidad.isNotEmpty()) {
+                                        Text(
+                                            text = "Comunidad: ${selectedCliente!!.nombreComunidad}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    if (selectedCliente!!.fechaUltimoPago.isNotEmpty()) {
+                                        Text(
+                                            text = "Último Pago: ${formatFechaSimple(selectedCliente!!.fechaUltimoPago)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                        )
+                                    }
                                 }
                             }
 
@@ -615,6 +652,117 @@ fun PagoScreen() {
             }
         )
     }
+
+    // Modal de Resumen y Confirmación de Cliente
+    if (clienteToPreview != null) {
+        ResumenClienteDialog(
+            cliente = clienteToPreview!!,
+            onDismiss = { clienteToPreview = null },
+            onConfirm = { cliente ->
+                selectCliente(cliente)
+                clienteToPreview = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun ResumenClienteDialog(
+    cliente: ClienteSearchResult,
+    onDismiss: () -> Unit,
+    onConfirm: (ClienteSearchResult) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .height(48.dp)
+                        .width(48.dp)
+                )
+                Text(
+                    text = "Resumen del Cliente",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = cliente.nombreCompleto,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                HorizontalDivider()
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ItemReciboRow(label = "ID Cliente", value = "#${cliente.id}")
+                        ItemReciboRow(
+                            label = "Comunidad",
+                            value = cliente.nombreComunidad.ifEmpty { "No especificada" },
+                            isHighlight = cliente.nombreComunidad.isNotEmpty()
+                        )
+                        if (cliente.telefono.isNotEmpty()) {
+                            ItemReciboRow(label = "Teléfono", value = cliente.telefono)
+                        }
+                        ItemReciboRow(label = "Saldo Actual", value = "$${cliente.saldoActual} MXN")
+                        ItemReciboRow(label = "Precio Mensual Base", value = "$${cliente.precioMensualBase} MXN")
+                        ItemReciboRow(
+                            label = "Último Pago",
+                            value = formatFechaSimple(cliente.fechaUltimoPago)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { onConfirm(cliente) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Confirmar Cliente")
+                }
+
+                OutlinedButton(
+                    onClick = { onDismiss() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        }
+    )
 }
 
 @Composable
@@ -670,6 +818,9 @@ private fun ExitoPagoDialog(
                     ) {
                         ItemReciboRow(label = "Cliente", value = cliente.nombreCompleto)
                         ItemReciboRow(label = "ID Cliente", value = "#${cliente.id}")
+                        if (cliente.nombreComunidad.isNotEmpty()) {
+                            ItemReciboRow(label = "Comunidad", value = cliente.nombreComunidad)
+                        }
                         ItemReciboRow(label = "Monto Pagado", value = "$${data.montoPagado} MXN", isHighlight = true)
                         ItemReciboRow(label = "Método", value = metodo)
 
@@ -757,5 +908,32 @@ private fun ItemReciboRow(
             fontWeight = if (isHighlight) FontWeight.Bold else FontWeight.Medium,
             color = if (isHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+private fun formatFechaSimple(rawFecha: String): String {
+    if (rawFecha.isBlank() || rawFecha.equals("null", ignoreCase = true)) {
+        return "Sin registros previos"
+    }
+    return try {
+        val cleanFecha = rawFecha.trim()
+        val inputFormat = if (cleanFecha.contains(":")) {
+            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        } else {
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        }
+        val date = inputFormat.parse(cleanFecha) ?: return rawFecha
+        val localeEs = Locale.forLanguageTag("es-MX")
+        val outputFormat = SimpleDateFormat("dd MMM yyyy", localeEs)
+        outputFormat.format(date)
+            .replace(".", "")
+            .split(" ")
+            .joinToString(" ") { word ->
+                if (word.isNotEmpty() && word[0].isLowerCase()) {
+                    word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(localeEs) else it.toString() }
+                } else word
+            }
+    } catch (e: Exception) {
+        rawFecha
     }
 }

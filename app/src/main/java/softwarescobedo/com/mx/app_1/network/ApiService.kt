@@ -149,12 +149,17 @@ class ApiService {
 
                         for (i in 0 until dataArray.length()) {
                             val item = dataArray.getJSONObject(i)
+                            val comunidadNombre = item.optString("nombre_comunidad", "").ifEmpty { item.optString("comunidad", "") }
                             listaClientes.add(
                                 ClienteSearchResult(
                                     id = item.optInt("id", 0),
                                     nombreCompleto = item.optString("nombre_completo", ""),
                                     saldoActual = item.optString("saldo_actual", "0.00"),
-                                    precioMensualBase = item.optString("precio_mensual_base", "0.00")
+                                    precioMensualBase = item.optString("precio_mensual_base", "0.00"),
+                                    telefono = item.optString("telefono", ""),
+                                    comunidad = item.optString("comunidad", ""),
+                                    nombreComunidad = comunidadNombre,
+                                    fechaUltimoPago = item.optString("fecha_ultimo_pago", "")
                                 )
                             )
                         }
